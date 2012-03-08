@@ -1,10 +1,14 @@
+from __future__ import absolute_import, with_statement
 import re
-
-from django.core.exceptions import ImproperlyConfigured
-
+import codecs
+import lxml
 from lxml import etree
 from lxml.etree import tostring
 from lxml.html import fromstring, soupparser
+
+from django.core.exceptions import ImproperlyConfigured
+
+from minifier.parser.base import ElementProxy, ParserBase
 
 class CssElement(ElementProxy):
     def attributes(self):
@@ -19,17 +23,17 @@ class CssElement(ElementProxy):
 
     def filename(self):
         if self._wrap.tag == 'link':
-            filename = self.findfile(self.get('href'))
+            return self.findfile(self._wrap.get('href'))
 
     def filecontent(self):
         if self._wrap.tag == 'link':
-            filename = self.findfile(self.get('href'))
+            filename = self.findfile(self._wrap.get('href'))
 
-            with codecs.open(filename, 'rb', charset) as fd:
+            with codecs.open(filename, 'rb', 'utf_8') as fd:
                 return fd.read()
 
     def inlinecontent(self):
-        return self.text
+        return self._wrap.text
 
 class JsElement(ElementProxy):
     def attributes(self):
@@ -42,18 +46,29 @@ class JsElement(ElementProxy):
         return 'file'
 
     def filename(self):
-        filename = self.findfile(self.get('src'))
+        return self.findfile(self._wrap.get('src'))
 
     def filecontent(self):
-        filename = self.findfile(self.get('src'))
+        filename = self.findfile(self._wrap.get('src'))
 
-        with codecs.open(filename, 'rb', charset) as fs:
+        with codecs.open(filename, 'rb', 'utf_8') as fs:
             return fs.read()
 
     def inlinecontent(self):
-        return self.text
+        return self._wrap.text
+
+class PlainElement(ElementProxy):
+    def attributes(self):
+        return dict(self._wrap.attrib)
+
+    def whereis(self):
+        return 'inline'
+
+    def inlinecontent(self):
+        return self._wrap.text
 
 class LxmlParser(ParserBase):
+    conditional_regex = re.compile('/\[if\s+.*?\]>.*?<!\[endif\]/')
 
     def parse(self, content):
         tree = fromstring('<root>%s</root>' % content)
@@ -69,26 +84,33 @@ class LxmlParser(ParserBase):
         ordered = []
 
         for elem in elements:
-            tag = elem.tag is etree.Comment and elem.tag() or elem.tag
+            if elem.tag is etree.Comment:
+                tag = elem.tag()
+            else:
+                tag = elem.tag
 
             if tag == '<!---->':
-                ordered.append( ('application/x-conditional-comment', elem) )
+                if conditional_regex.match(elem.text):
+                    pass
+                    #ordered.append( ('application/x-conditional-comment', elem) )
 
-            if tag == 'style' or (tag == 'link' and elem.get('rel') == 'stylesheet'):
+            elif tag == 'style' or (tag == 'link' and elem.get('rel') == 'stylesheet'):
                 ordered.append( ('text/css', CssElement(elem)) )
 
-            if tag == 'script' and (elem.get('language') == None or elem.get('language') == '' or elem.get('language') == 'javascript'):
-                ordered.append( ('application/js', JsElement(elem)) )
+            elif tag == 'script' and (elem.get('language') == None or elem.get('language') == '' or elem.get('language') == 'javascript'):
+                ordered.append( ('application/javascript', JsElement(elem)) )
+
+            else:
+                ordered.append( ('text/plain', PlainElement(elem)) )
 
         return ordered
 
     def get_mimetypes_grouped(self, elements):
         mime_group = {}
-        regex = re.compile('/\[if\s+.*?\]>.*?<!\[endif\]/')
 
         # cant find the comments that have conditionals with xpath
         for comm in elements.iterchildren(tag=etree.Comment):
-            for conditional in regex.findall(comm.text):
+            for conditional in conditional_regex.findall(comm.text):
                 l = mime_group.get('application/x-conditional-comment') or []
                 l.append(conditional)
                 mime_group['application/x-conditional-comment'] = l

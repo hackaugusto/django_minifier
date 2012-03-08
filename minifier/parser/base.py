@@ -1,8 +1,14 @@
-from os import path
+from __future__ import absolute_import
+import os.path
 import urllib
 
-from django.contrib.staticfiles import finders
-from django.config import settings
+from django.core.files.storage import get_storage_class
+try:
+    from staticfiles import finders
+except ImportError:
+    from django.contrib.staticfiles import finders
+
+from minifier.conf import settings
 
 class ParserBase(object):
     """
@@ -35,7 +41,7 @@ class ElementProxy(object):
         raise NotImplementedError
 
     def modified(self):
-        return path.getmtime(self.filename())
+        return str(os.path.getmtime(self.filename()))
 
     def filecontent(self):
         '''
@@ -66,15 +72,22 @@ class ElementProxy(object):
 
     def findfile(self, url):
         url = urllib.unquote(url).split("?", 1)[0]
-        url = path.normpath(url.lstrip('/'))
+        url = os.path.normpath(url.lstrip('/'))
 
-        if settings.STATIC_URL in url:
-            path = url[ url.find(settings.STATIC_URL) + len(settings.STATIC_URL) ]
+        prefix = [ settings.STATIC_URL, settings.MEDIA_URL ]
 
-        elif settings.MEDIA_URL in url:
-            path = url[ url.find(settings.MEDIA_URL) + len(settings.MEDIA_URL) ]
+        if settings.STATIC_URL[0] == '/':
+            prefix.append(settings.STATIC_URL[1:])
 
-        path = finders.find(path)
+        if settings.MEDIA_URL[0] == '/':
+            prefix.append(settings.MEDIA_URL[1:])
 
-        return path
+        for p in prefix:
+            if p in url:
+                length = url.find(p) + len(p)
+                path = url[length:]
 
+        if path is None:
+            path = url
+
+        return finders.find(path)

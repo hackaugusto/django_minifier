@@ -15,38 +15,32 @@ class MinifierNode(template.Node):
         '''
         self.nodelist = nodelist or template.NodeList() # probably dont need this
         if name is not None:
-            name = import_module(name)
+            module, attr = name.rsplit('.',1)
+            mod = import_module(module)
+            name= getattr(mod, attr)
 
         self.name = name
 
         # tries to compile now if there is no other tags
         # because there is no other tags we can safely give it a {} as context
+        '''
         if not self.nodelist.contains_nontext:
             minifier = Minifier()
 
             try:
                 compressed_data = minifier.minify(nodelist.render({}), {}, self.name)
-                if cache_key:
-                    cache_set(cache_key, compressed_data)
             except Exception, e:
-                # don't do anything in production
                 if settings.DEBUG:
                     raise e
+        '''
 
     def render(self, context):
         rendered = self.nodelist.render(context)
 
-        if settings.DEBUG or setting.MINIFY_DISABLED:
-            return rendered
+        #if settings.DEBUG or setting.MINIFY_DISABLED:
+        #    return rendered
 
-        minifier = Minifier()
-
-        try:
-            return minifier.minify(rendered, self.name)
-        except Exception, e:
-            # don't do anything in production
-            if settings.DEBUG:
-                raise e
+        return Minifier().minify(rendered, self.name)
 
 @register.tag
 def minify(parser, token):
@@ -85,7 +79,7 @@ def minify(parser, token):
         raise template.TemplateSyntaxError(
             "Too many arguments for %r." % args[0])
 
-    nodelist = parser.parse(('endcompress',))
+    nodelist = parser.parse(('endminify',))
     parser.delete_first_token()
 
     if len(args) == 2:
