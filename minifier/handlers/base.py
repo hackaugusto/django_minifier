@@ -4,7 +4,6 @@ from itertools import groupby
 
 from django.core.files.base import ContentFile
 from django.core.files.storage import get_storage_class
-from django.utils.encoding import smart_unicode
 
 class MinifierBase(object):
     def minify(self, elements):
@@ -51,8 +50,7 @@ class MinifierBase(object):
         if storage.exists(name):
             raise RuntimeError('Name conflict, ' + name + ' already exists.')
 
-        storage.save(name, ContentFile(smart_unicode(content)))
-        print(storage.url(name))
+        storage.save(name, ContentFile(content.encode('utf_8')))
         return storage.url(name)
 
     def js_properties(self, element):
@@ -63,7 +61,13 @@ class MinifierBase(object):
         by compatible is meant that scripts with defer and/or async
         cannont be mixed with script that do not have defer or async.
         '''
-        return { k:v for k,v in element.attributes().iteritems() if k in ['defer','async','src']}
+        # remove attributes that are not in this list
+        attrs = element.attributes()
+        keys = set() - set(['defer','async','src'])
+        for k in keys:
+            del attrs[k]
+
+        return attrs
 
     def js_group(self, elements, key=None):
         '''
@@ -91,7 +95,13 @@ class MinifierBase(object):
         by compatible is meant that css files with different media queries
         cannont be joined
         '''
-        return { k:v for k,v in element.attributes().iteritems() if k in ['media','scoped','href']}
+        # remove attributes that are not in this list
+        attrs = element.attributes()
+        keys = set() - set(['media','scoped','href'])
+        for k in keys:
+            del attrs[k]
+
+        return attrs
 
     def css_group(self, elements, key=None):
         '''

@@ -1,5 +1,4 @@
 from __future__ import absolute_import, with_statement
-import re
 import codecs
 import lxml
 from lxml import etree
@@ -8,7 +7,9 @@ from lxml.html import fromstring, soupparser
 
 from django.core.exceptions import ImproperlyConfigured
 
-from minifier.parser.base import ElementProxy, ParserBase
+from minifier.parser.base import ConditionalElementProxy, ElementProxy, ParserBase
+
+conditional_regex = ConditionalElementProxy.conditional_regex
 
 class CssElement(ElementProxy):
     def attributes(self):
@@ -57,18 +58,30 @@ class JsElement(ElementProxy):
     def inlinecontent(self):
         return self._wrap.text
 
+class ConditionalCommentElement(ConditionalElementProxy):
+    def attributes(self):
+        match = conditional_regex.search(self._wrap.text)
+
+        attrs = {}
+        if match:
+            attrs['condition'] = match.group()
+
+        return attrs
+
+    def inlinecontent(self):
+        return '<!--' + self._wrap.text + '-->'
+
 class PlainElement(ElementProxy):
     def attributes(self):
-        return dict(self._wrap.attrib)
+        return {}
 
     def whereis(self):
         return 'inline'
 
     def inlinecontent(self):
-        return self._wrap.text
+        return etree.tostring(self._wrap)
 
 class LxmlParser(ParserBase):
-    conditional_regex = re.compile('/\[if\s+.*?\]>.*?<!\[endif\]/')
 
     def parse(self, content):
         tree = fromstring('<root>%s</root>' % content)
@@ -84,15 +97,17 @@ class LxmlParser(ParserBase):
         ordered = []
 
         for elem in elements:
-            if elem.tag is etree.Comment:
-                tag = elem.tag()
-            else:
-                tag = elem.tag
+            tag = elem.tag
 
-            if tag == '<!---->':
-                if conditional_regex.match(elem.text):
-                    pass
-                    #ordered.append( ('application/x-conditional-comment', elem) )
+            if elem.tag is etree.Comment:
+                # str(elem) returns the comment start '<!--' and comment end '-->'
+                # elem.text returns without
+                print(str(elem))
+                if conditional_regex.match(str(elem)):
+                    print('conditional')
+                    ordered.append( ('application/x-conditional-comment', ConditionalCommentElement(elem)) )
+
+                # ignore another comments
 
             elif tag == 'style' or (tag == 'link' and elem.get('rel') == 'stylesheet'):
                 ordered.append( ('text/css', CssElement(elem)) )

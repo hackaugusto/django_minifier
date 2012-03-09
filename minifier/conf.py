@@ -6,7 +6,12 @@ from appconf import AppConf
 class CompressorConf(AppConf):
     DISABLED = settings.DEBUG
     PARSER = 'minifier.parser.lxml.LxmlParser'
-    MINIFIER_MINIFIERS = ( ('application/javascript', 'minifier.handlers.js.JsMinifier'), ('text/css', 'minifier.handlers.css.CssMinifier'), ('text/plain','minifier.handlers.plain.PlainMinifier'))
+    MINIFIER_MINIFIERS = (
+        ('application/javascript', 'minifier.handlers.js.JsMinifier'),
+        ('text/css', 'minifier.handlers.css.CssMinifier'),
+        ('text/plain','minifier.handlers.plain.PlainMinifier'),
+        ('application/x-conditional-comment','minifier.handlers.comment.ConditionalCommentMinifier'),
+    )
 
     CLOSURE_COMPILER_BINARY = 'java -jar compiler.jar'
     CSSTIDY_BINARY = 'csstidy'

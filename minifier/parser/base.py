@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 import os.path
 import urllib
+import re
 
 from django.core.files.storage import get_storage_class
 try:
@@ -82,12 +83,28 @@ class ElementProxy(object):
         if settings.MEDIA_URL[0] == '/':
             prefix.append(settings.MEDIA_URL[1:])
 
+        path = None
         for p in prefix:
             if p in url:
                 length = url.find(p) + len(p)
                 path = url[length:]
 
-        if path is None:
+        if path:
             path = url
+        else:
+            raise Exception('Could not open the file %s' % url)
 
         return finders.find(path)
+
+class ConditionalElementProxy(ElementProxy):
+    conditional_regex = re.compile('<!--\[if\s+(?P<test>.*?)\s*\]>(?P<content>.*?)<!\[endif\]-->',re.DOTALL)
+
+    def whereis(self):
+        return 'inline'
+
+    def get_test(self):
+        return self.conditional_regex.match(self.content()).group('test')
+
+    def get_inlinecontent(self):
+        return self.conditional_regex.match(self.content()).group('content')
+

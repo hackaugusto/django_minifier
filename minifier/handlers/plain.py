@@ -4,5 +4,8 @@ from minifier.handlers.base import MinifierBase
 
 class PlainMinifier(MinifierBase):
     def minify(self, elements, name):
-        return ''
+        output = ''
+        for e in elements:
+            output += e.content()
+        return output
 

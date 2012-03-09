@@ -55,10 +55,10 @@ class CssMinifier(MinifierBase):
 
             if one.whereis() == 'file':
                 url = self.compressed(name)
-                if url is None:
+                if not url:
                     tag += 'href="%s" />' % self.save(result, name)
                 else:
-                    tag += 'src="%s"></script>' % url
+                    tag += 'href="%s" />' % url
             else:
                 tag += '>' + result + '</style>'
 

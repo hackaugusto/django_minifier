@@ -54,7 +54,7 @@ class JsMinifier(MinifierBase):
 
             if one.whereis() == 'file':
                 url = self.compressed(name)
-                if url is None:
+                if not url:
                     tag += 'src="%s"></script>' % self.save(result, name)
                 else:
                     tag += 'src="%s"></script>' % url
